@@ -35,8 +35,9 @@ import cream.util
 
 from cream.contrib.melange.dialogs import AddWidgetDialog
 
-from widget import Widget
+from widget import Widget, WidgetWindow
 from thingy import Thingy
+from container import Container
 from httpserver import HttpServer
 
 EDIT_MODE_NONE = 0
@@ -47,75 +48,6 @@ MODE_NORMAL = 0
 MODE_EDIT = 1
 
 OVERLAY = False
-
-class WidgetWindow(gtk.Window):
-    """
-    The WidgetWindow class is being used for displaying Melange's widget in window mode.
-    """
-
-    def __init__(self, widget):
-
-        self.widget = widget
-        self.widget.connect('remove', self.remove_cb)
-        self.widget.connect('move', self.move_cb)
-        self.widget.connect('resize', self.resize_cb)
-
-        gtk.Window.__init__(self)
-
-        # Setting up the Widget's window...
-        self.stick()
-        self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DOCK)
-        #self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
-        self.set_keep_below(True)
-        self.set_skip_pager_hint(True)
-        self.set_skip_taskbar_hint(True)
-        self.set_decorated(False)
-        self.set_app_paintable(True)
-        self.set_resizable(False)
-        self.set_default_size(10, 10)
-        self.connect('expose-event', self.expose_cb)
-        self.connect('focus-out-event', self.focus_cb)
-        self.set_colormap(self.get_screen().get_rgba_colormap())
-
-        self.set_property('accept-focus', False)
-
-        # Creating container for receiving events:
-        self.bin = gtk.EventBox()
-        self.bin.add(self.widget.view)
-
-        self.add(self.bin)
-
-        self.move(*self.widget.get_position())
-
-
-    def focus_cb(self, source, event):
-        self.set_property('accept-focus', False)
-
-
-    def expose_cb(self, source, event):
-        """ Clear the widgets background. """
-
-        ctx = source.window.cairo_create()
-
-        ctx.set_operator(cairo.OPERATOR_SOURCE)
-        ctx.set_source_rgba(0, 0, 0, 0)
-        ctx.paint()
-
-
-    def remove_cb(self, widget):
-
-        self.destroy()
-
-
-    def resize_cb(self, widget, width, height):
-
-        self.resize(width, height)
-        self.set_size_request(width, height)
-
-
-    def move_cb(self, widget, x, y):
-
-        self.move(x, y)
 
 
 class Background(gobject.GObject):
@@ -259,6 +191,8 @@ class Melange(cream.Module, cream.ipc.Object):
         self.thingy.connect('show-settings', lambda *args: self.config.show_dialog())
         self.thingy.connect('show-add-widgets', lambda *args: self.add_widget())
 
+        self.containers = []
+
         # Load widgets stored in configuration.
         for widget in self.config.widgets:
             self.load_widget(**widget)
@@ -275,6 +209,14 @@ class Melange(cream.Module, cream.ipc.Object):
             self.add_widget_dialog.liststore.append((w['id'], w['id'], w['name'], '', pb, label))
 
         self.hotkeys.connect('hotkey-activated', self.hotkey_activated_cb)
+
+
+    def add_container(self):
+
+        c = Container()
+        c.window.set_transient_for(self.background.window)
+        self.containers.append(c)
+        return c
 
 
     def add_widget(self):
@@ -458,6 +400,18 @@ class Melange(cream.Module, cream.ipc.Object):
                         ]
 
                         w_distances.sort(key=lambda x:(x[1], x[0]))
+
+                        if w_distances[0][1] <= 20:
+                            c = self.add_container()
+                            if w_distances[0][0] == 'right':
+                                c.add_widget(w)
+                                c.add_widget(widget)
+                                c.set_position(w_x - 10, w_y - 10)
+                            elif w_distances[0][0] == 'left':
+                                c.add_widget(widget)
+                                c.add_widget(w)
+                                c.set_position(widget.get_position()[0] - 10, widget.get_position()[1] - 10)
+                            return
 
                 gobject.timeout_add(20, move_cb, new_x, new_y)
 

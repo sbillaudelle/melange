@@ -37,6 +37,13 @@ class HttpServer(object):
         return send_file(file, path)
 
 
+    @route(r'/container/(?P<file>.*)')
+    def container_files(file):
+
+        path = os.path.join(_MELANGE.context.working_directory, 'data/container')
+        return send_file(file, path)
+
+
     @route(r'/widget/(?P<file>.*)')
     def widget_files(file):
 

@@ -323,3 +323,73 @@ class Widget(gobject.GObject, cream.Component):
             'x'    : self.get_position()[0],
             'y'    : self.get_position()[1],
         }
+
+
+class WidgetWindow(gtk.Window):
+    """
+    The WidgetWindow class is being used for displaying Melange's widget in window mode.
+    """
+
+    def __init__(self, widget):
+
+        self.widget = widget
+        self.widget.connect('remove', self.remove_cb)
+        self.widget.connect('move', self.move_cb)
+        self.widget.connect('resize', self.resize_cb)
+
+        gtk.Window.__init__(self)
+
+        # Setting up the Widget's window...
+        self.stick()
+        self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DOCK)
+        #self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
+        self.set_keep_below(True)
+        self.set_skip_pager_hint(True)
+        self.set_skip_taskbar_hint(True)
+        self.set_decorated(False)
+        self.set_app_paintable(True)
+        self.set_resizable(False)
+        self.set_default_size(10, 10)
+        self.connect('expose-event', self.expose_cb)
+        self.connect('focus-out-event', self.focus_cb)
+        self.set_colormap(self.get_screen().get_rgba_colormap())
+
+        self.set_property('accept-focus', False)
+
+        # Creating container for receiving events:
+        self.bin = gtk.EventBox()
+        self.bin.add(self.widget.view)
+
+        self.add(self.bin)
+
+        self.move(*self.widget.get_position())
+
+
+    def focus_cb(self, source, event):
+        self.set_property('accept-focus', False)
+
+
+    def expose_cb(self, source, event):
+        """ Clear the widgets background. """
+
+        ctx = source.window.cairo_create()
+
+        ctx.set_operator(cairo.OPERATOR_SOURCE)
+        ctx.set_source_rgba(0, 0, 0, 0)
+        ctx.paint()
+
+
+    def remove_cb(self, widget):
+
+        self.destroy()
+
+
+    def resize_cb(self, widget, width, height):
+
+        self.resize(width, height)
+        self.set_size_request(width, height)
+
+
+    def move_cb(self, widget, x, y):
+
+        self.move(x, y)
